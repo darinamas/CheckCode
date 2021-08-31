@@ -9,9 +9,9 @@ import Foundation
 
 class Singleton {
    static var shared = Singleton()
-    var formatCode = CodeFormat.eightNumbers
+    var formatCode = CodeFormat.nineNumbers
     var pinCode: String = "000000000"
-    
+    var mask = ""
 
     private init() {
     }

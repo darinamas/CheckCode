@@ -8,28 +8,29 @@
 import UIKit
 import SnapKit
 
-class ViewController: UIViewController, UITextFieldDelegate {
+final class ViewController: UIViewController, UITextFieldDelegate {
     
+    var viewModel: HomeViewViewModelType?
+    private lazy var segmentcontols = UISegmentedControl()
     private lazy var superView = UIView()
-    let hiddenTF: CustomeTextField = CustomeTextField()
+    private lazy var hiddenTF: CustomeTextField = CustomeTextField()
     private lazy var pinCodeLabel: UILabel = UILabel()
-    var mask = ""
-    var formatCode = Singleton.shared.formatCode
-
-    private var pinCode: String = Singleton.shared.pinCode
+    private lazy var pinCode: String = Singleton.shared.pinCode
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        self.viewModel = ViewControllerModelView() //delegat
+        viewModel?.delegate = self  //delegatom dla vievModel budet vystupat MainViewController
         
         listenKeyBoard()
-        hiddenTF.customizeTF()
-        selectCodeFormat()
+        viewModel?.codeFormatSelector()
         setUI()
         runSnapKitLayout()
-        pinCodeLabel.text = formattedPinCode(code: pinCode)
-        
+       
+        pinCodeLabel.text = viewModel?.maskPinCode(code: pinCode)
         hiddenTF.delegate = self
+        
         hiddenTF.addTarget(self, action: #selector(textFieldDidChange(sender:)), for: .editingChanged)
         
     }
@@ -43,27 +44,27 @@ class ViewController: UIViewController, UITextFieldDelegate {
 
 extension ViewController {
     
-    private func selectCodeFormat() {
-        switch Singleton.shared.formatCode {
-        case .sixNumbers: mask = "### ###"
-        case .nineNumbers: mask = "### ### ###"
-        case .eightNumbers: mask = "#### ####"
-        }
-    }
-    
     private func listenKeyBoard() {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
     
     private func setUI() {
-        superView.backgroundColor = .blue
+        superView.backgroundColor = .white
         self.view.addSubview(superView)
         self.view.addSubview(hiddenTF)
         setLabel()
-        
+        hiddenTF.customizeTF()
+        setSegmentContol()
     }
     
+    private func setSegmentContol() {
+        segmentcontols = UISegmentedControl(items: ["6 код", "9 код", "8 код"])
+        self.superView.addSubview(segmentcontols)
+        segmentcontols.addTarget(self, action: #selector(handleSelgmentChange), for: .valueChanged)
+
+     
+    }
     private func setLabel() {
         pinCodeLabel.textColor = UIColor.black
         pinCodeLabel.textAlignment = NSTextAlignment.center
@@ -86,6 +87,29 @@ extension ViewController {
             make.height.equalTo(100)
             make.leading.equalTo(50)
         }
+        
+        segmentcontols.snp.makeConstraints { (make) in
+            make.top.equalTo(superView).offset(100)
+            make.width.equalTo(300)
+            make.height.equalTo(100)
+            make.leading.equalTo(50)
+        }
+    }
+    
+    @objc func handleSelgmentChange() {
+      
+        hiddenTF.text = ""
+        Singleton.shared.pinCode = "000000000"
+        
+        switch segmentcontols.selectedSegmentIndex {
+        case 0: Singleton.shared.formatCode = CodeFormat.sixNumbers
+        case 1: Singleton.shared.formatCode = CodeFormat.nineNumbers
+        case 2: Singleton.shared.formatCode = CodeFormat.eightNumbers
+        default:
+            Singleton.shared.formatCode = CodeFormat.nineNumbers
+        }
+        viewModel?.codeFormatSelector()
+        pinCodeLabel.text = viewModel?.maskPinCode(code: Singleton.shared.pinCode)
     }
     
     @objc func keyboardWillShow(notification: NSNotification) {
@@ -101,10 +125,21 @@ extension ViewController {
         self.superView.frame.origin.y = 0
     }
     
-    private func switchText() -> String{
+    @objc func  textFieldDidChange(sender: UITextField) {
+        hiddenTF.checkMaxLength(maxLength: Singleton.shared.formatCode.rawValue)
+        let text = viewModel?.addingZeroToText()
+        pinCodeLabel.text = viewModel!.maskPinCode(code: text!)
+    }
+    
+}
+
+extension ViewController: MainViewModelDelegate{
+    
+    func switchText() -> String {
         let countText = hiddenTF.text?.count
         
-        if formatCode == CodeFormat.nineNumbers{
+        
+        if Singleton.shared.formatCode == CodeFormat.nineNumbers{
             switch countText {
             case 0: pinCode = "000000000"
             case 1: pinCode = hiddenTF.text! + "000000000"
@@ -117,7 +152,7 @@ extension ViewController {
             case 8: pinCode = hiddenTF.text! + "0"
             default:pinCode   = hiddenTF.text!
             }
-        } else if formatCode == CodeFormat.sixNumbers {
+        } else if Singleton.shared.formatCode == CodeFormat.sixNumbers {
             switch countText {
             case 0: pinCode = "000000"
             case 1: pinCode = hiddenTF.text! + "000000"
@@ -127,7 +162,7 @@ extension ViewController {
             case 5: pinCode = hiddenTF.text! + "0"
             default: pinCode   = hiddenTF.text!
             }
-        } else if formatCode == CodeFormat.eightNumbers {
+        } else if Singleton.shared.formatCode == CodeFormat.eightNumbers {
             switch countText {
             case 0: pinCode = "00000000"
             case 1: pinCode = hiddenTF.text! + "0000000"
@@ -141,37 +176,14 @@ extension ViewController {
             }
         }
         Singleton.shared.pinCode = pinCode
-        return pinCode
-    }
-    
-    @objc func  textFieldDidChange(sender: UITextField) {
-        hiddenTF.checkMaxLength(maxLength: formatCode.rawValue)
-        let text = switchText()
-        pinCodeLabel.text = formattedPinCode(code: text)
-    }
-    
-    private func formattedPinCode(code: String) -> String {
-        
-        let cleanPinCode = code.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
-        var result = ""
-        var index = cleanPinCode.startIndex
-        for ch in mask where index < cleanPinCode.endIndex {
-            if ch == "#" {
-                result.append(cleanPinCode[index])
-                index = cleanPinCode.index(after: index)
-            } else {
-                result.append(ch)
-            }
-        }
-        return result
+        return Singleton.shared.pinCode
     }
     
     func changeColorText(text: String) {
-        let range = (text as! NSString).range(of: hiddenTF.text!)
+        let range = (text as NSString).range(of: hiddenTF.text!)
         let attributedString = NSMutableAttributedString(string:hiddenTF.text!)
         attributedString.addAttribute(NSAttributedString.Key.foregroundColor, value: UIColor.red , range: range)
         pinCodeLabel.attributedText = attributedString
     }
     
 }
-

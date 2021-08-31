@@ -20,8 +20,9 @@ class CustomeTextField: UITextField {
     }
     
     func customizeTF() {
-        self.frame = CGRect(x: 20, y: 20, width: 100, height: 200)
-        self.backgroundColor = .red
+        self.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
+        self.backgroundColor = .clear
+        self.textColor = .clear
         self.becomeFirstResponder()
         self.keyboardType = UIKeyboardType.numberPad
     
